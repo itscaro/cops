@@ -10,9 +10,10 @@ require_once('base.php');
 require_once('serie.php');
 require_once('author.php');
 require_once('tag.php');
-require_once ("customcolumn.php");
+require_once('language.php');
+require_once("customcolumn.php");
 require_once('data.php');
-require_once('php-epub-meta/epub.php');
+require_once('resources/php-epub-meta/epub.php');
 
 // Silly thing because PHP forbid string concatenation in class const
 define ('SQL_BOOKS_LEFT_JOIN', "left outer join comments on comments.book = books.id 
@@ -26,10 +27,16 @@ define ('SQL_BOOKS_BY_SERIE', "select {0} from books_series_link, books " . SQL_
                                                     where books_series_link.book = books.id and series = ? {1} order by series_index");
 define ('SQL_BOOKS_BY_TAG', "select {0} from books_tags_link, books " . SQL_BOOKS_LEFT_JOIN . "
                                                     where books_tags_link.book = books.id and tag = ? {1} order by sort");
+define ('SQL_BOOKS_BY_LANGUAGE', "select {0} from books_languages_link, books " . SQL_BOOKS_LEFT_JOIN . "
+                                                    where books_languages_link.book = books.id and lang_code = ? {1} order by sort");
 define ('SQL_BOOKS_BY_CUSTOM', "select {0} from {2}, books " . SQL_BOOKS_LEFT_JOIN . "
                                                     where {2}.book = books.id and {2}.{3} = ? {1} order by sort");
 define ('SQL_BOOKS_QUERY', "select {0} from books " . SQL_BOOKS_LEFT_JOIN . "
-                                                    where (exists (select null from authors, books_authors_link where book = books.id and author = authors.id and authors.name like ?) or title like ?) {1} order by books.sort");
+                                                    where (
+                                                    exists (select null from authors, books_authors_link where book = books.id and author = authors.id and authors.name like ?) or
+                                                    exists (select null from tags, books_tags_link where book = books.id and tag = tags.id and tags.name like ?) or
+                                                    exists (select null from series, books_series_link on book = books.id and books_series_link.series = series.id and series.name like ?) or
+                                                    title like ?) {1} order by books.sort");
 define ('SQL_BOOKS_RECENT', "select {0} from books " . SQL_BOOKS_LEFT_JOIN . "
                                                     where 1=1 {1} order by timestamp desc limit ");
 
@@ -44,6 +51,7 @@ class Book extends Base {
     const SQL_BOOKS_BY_AUTHOR = SQL_BOOKS_BY_AUTHOR;
     const SQL_BOOKS_BY_SERIE = SQL_BOOKS_BY_SERIE;
     const SQL_BOOKS_BY_TAG = SQL_BOOKS_BY_TAG;
+    const SQL_BOOKS_BY_LANGUAGE = SQL_BOOKS_BY_LANGUAGE;
     const SQL_BOOKS_BY_CUSTOM = SQL_BOOKS_BY_CUSTOM;
     const SQL_BOOKS_QUERY = SQL_BOOKS_QUERY;
     const SQL_BOOKS_RECENT = SQL_BOOKS_RECENT;
@@ -63,6 +71,7 @@ class Book extends Base {
     public $authors = NULL;
     public $serie = NULL;
     public $tags = NULL;
+    public $languages = NULL;
     public $format = array ();
 
     
@@ -72,7 +81,7 @@ class Book extends Base {
         $this->title = $line->title;
         $this->timestamp = strtotime ($line->timestamp);
         $this->pubdate = strtotime ($line->pubdate);
-        $this->path = $config['calibre_directory'] . $line->path;
+        $this->path = Base::getDbDirectory () . $line->path;
         $this->relativePath = $line->path;
         $this->seriesIndex = $line->series_index;
         $this->comment = $line->comment;
@@ -94,16 +103,82 @@ class Book extends Base {
     }
     
     public function getUri () {
-        return "?page=".parent::PAGE_BOOK_DETAIL."&amp;id=$this->id";
+        return "?page=".parent::PAGE_BOOK_DETAIL."&id=$this->id";
     }
     
-    public function getDetailUrl () {
+    public function getContentArray () {
         global $config;
-        if ($config['cops_use_fancyapps'] == 0) { 
-            return 'index.php' . $this->getUri (); 
-        } else { 
-            return 'bookdetail.php?id=' . $this->id; 
+        $i = 0;
+        $preferedData = array ();
+        foreach ($config['cops_prefered_format'] as $format)
+        {
+            if ($i == 2) { break; }
+            if ($data = $this->getDataFormat ($format)) {
+                $i++;
+                array_push ($preferedData, array ("url" => $data->getHtmlLink (), "name" => $format));
+            }
         }
+        $serie = $this->getSerie ();
+        if (is_null ($serie)) {
+            $sn = "";
+            $scn = "";
+            $su = "";
+        } else {
+            $sn = $serie->name;
+            $scn = str_format (localize ("content.series.data"), $this->seriesIndex, $serie->name);
+            $link = new LinkNavigation ($serie->getUri ());
+            $su = $link->hrefXhtml ();
+        }
+        
+        return array ("id" => $this->id,
+                      "hasCover" => $this->hasCover,
+                      "preferedData" => $preferedData,
+                      "rating" => $this->getRating (),
+                      "pubDate" => $this->getPubDate (),
+                      "languagesName" => $this->getLanguages (),
+                      "authorsName" => $this->getAuthorsName (),
+                      "tagsName" => $this->getTagsName (),
+                      "seriesName" => $sn,
+                      "seriesIndex" => $this->seriesIndex,
+                      "seriesCompleteName" => $scn,
+                      "seriesurl" => $su);  
+    
+    }
+    public function getFullContentArray () {
+        global $config;
+        $out = $this->getContentArray ();
+        
+        $out ["coverurl"] = Data::getLink ($this, "jpg", "image/jpeg", Link::OPDS_IMAGE_TYPE, "cover.jpg", NULL)->hrefXhtml ();
+        $out ["thumbnailurl"] = Data::getLink ($this, "jpg", "image/jpeg", Link::OPDS_THUMBNAIL_TYPE, "cover.jpg", NULL, NULL, $config['cops_html_thumbnail_height'] * 2)->hrefXhtml ();
+        $out ["content"] = $this->getComment (false);
+        $out ["datas"] = array ();
+        $dataKindle = $this->GetMostInterestingDataToSendToKindle ();
+        foreach ($this->getDatas() as $data) {
+            $tab = array ("id" => $data->id, "format" => $data->format, "url" => $data->getHtmlLink (), "mail" => 0);
+            if (!empty ($config['cops_mail_configuration']) && !is_null ($dataKindle) && $data->id == $dataKindle->id) {
+                $tab ["mail"] = 1;
+            }
+            array_push ($out ["datas"], $tab);
+        }
+        $out ["authors"] = array ();
+        foreach ($this->getAuthors () as $author) {
+            $link = new LinkNavigation ($author->getUri ());
+            array_push ($out ["authors"], array ("name" => $author->name, "url" => $link->hrefXhtml ()));
+        }
+        $out ["tags"] = array ();
+        foreach ($this->getTags () as $tag) {
+            $link = new LinkNavigation ($tag->getUri ());
+            array_push ($out ["tags"], array ("name" => $tag->name, "url" => $link->hrefXhtml ()));
+        }
+        ;
+        return $out;
+    }
+    
+    public function getDetailUrl ($permalink = false) {
+        global $config;
+        $urlParam = $this->getUri ();
+        if (!is_null (GetUrlParam (DB))) $urlParam = addURLParameter ($urlParam, DB, GetUrlParam (DB));
+        return 'index.php' . $urlParam; 
     }
     
     public function getTitle () {
@@ -117,7 +192,7 @@ class Book extends Base {
         return $this->authors;
     }
     
-    public function getFilterString () {
+    public static function getFilterString () {
         $filter = getURLParam ("tag", NULL);
         if (empty ($filter)) return "";
         
@@ -137,17 +212,7 @@ class Book extends Base {
     }
     
     public function getAuthorsName () {
-        $authorList = null;
-        foreach ($this->getAuthors () as $author) {
-            if ($authorList) {
-                $authorList = $authorList . ", " . $author->name;
-            }
-            else
-            {
-                $authorList = $author->name;
-            }
-        }
-        return $authorList;
+        return implode (", ", array_map (function ($author) { return $author->name; }, $this->getAuthors ()));
     }
     
     public function getSerie () {
@@ -167,7 +232,7 @@ class Book extends Base {
         $result->execute (array ($this->id));
         while ($post = $result->fetchObject ())
         {
-            array_push ($lang, $post->lang_code);
+            array_push ($lang, Language::getLanguageString($post->lang_code));
         }
         return implode (", ", $lang);
     }
@@ -206,6 +271,21 @@ class Book extends Base {
         }
         return $this->datas;
     }
+	
+	public function GetMostInterestingDataToSendToKindle ()
+	{
+		$bestFormatForKindle = array ("EPUB", "PDF", "MOBI");
+		$bestRank = -1;
+		$bestData = NULL;
+		foreach ($this->getDatas () as $data) {
+			$key = array_search ($data->format, $bestFormatForKindle);
+			if ($key !== false && $key > $bestRank) {
+				$bestRank = $key;
+				$bestData = $data;
+			}
+		}
+		return $bestData;
+	}
     
     public function getDataById ($idData)
     {
@@ -219,17 +299,7 @@ class Book extends Base {
 
     
     public function getTagsName () {
-        $tagList = null;
-        foreach ($this->getTags () as $tag) {
-            if ($tagList) {
-                $tagList = $tagList . ", " . $tag->name;
-            }
-            else
-            {
-                $tagList = $tag->name;
-            }
-        }
-        return $tagList;
+        return implode (", ", array_map (function ($tag) { return $tag->name; }, $this->getTags ()));
     }
     
     public function getRating () {
@@ -245,6 +315,15 @@ class Book extends Base {
         }
         return $retour;
     }
+     
+    public function getPubDate () {
+        if (is_null ($this->pubdate) || ($this->pubdate <= -58979923200)) {
+            return "";
+        }
+        else {
+            return date ("Y", $this->pubdate);
+        }
+    }
     
     public function getComment ($withSerie = true) {
         $addition = "";
@@ -252,9 +331,9 @@ class Book extends Base {
         if (!is_null ($se) && $withSerie) {
             $addition = $addition . "<strong>" . localize("content.series") . "</strong>" . str_format (localize ("content.series.data"), $this->seriesIndex, htmlspecialchars ($se->name)) . "<br />\n";
         }
-        if (preg_match ("/<\/(div|p|a)>/", $this->comment))
+        if (preg_match ("/<\/(div|p|a|span)>/", $this->comment))
         {
-            return $addition . preg_replace ("/<(br|hr)>/", "<$1 />", $this->comment);
+            return $addition . html2xhtml ($this->comment);
         }
         else
         {
@@ -283,6 +362,7 @@ class Book extends Base {
         else
         {
             $data = $this->getDataById ($idData);
+            if (!$data) return NULL;
             $file = $data->name . "." . strtolower ($data->format);
         }
 
@@ -298,6 +378,7 @@ class Book extends Base {
     
     public function getUpdatedEpub ($idData)
     {
+        global $config;
         $data = $this->getDataById ($idData);
             
         try
@@ -313,12 +394,17 @@ class Book extends Base {
             $epub->Language ($this->getLanguages ());
             $epub->Description ($this->getComment (false));
             $epub->Subjects ($this->getTagsName ());
+            $epub->Cover2 ($this->getFilePath ("jpg"), "image/jpeg");
+            $epub->Calibre ($this->uuid);
             $se = $this->getSerie ();
             if (!is_null ($se)) {
                 $epub->Serie ($se->name);
                 $epub->SerieIndex ($this->seriesIndex);
             }
-            $epub->download ($data->getFilename ());
+            if ($config['cops_provide_kepub'] == "1"  && preg_match("/Kobo/", $_SERVER['HTTP_USER_AGENT'])) {
+                $epub->updateForKepub ();
+            }
+            $epub->download ($data->getUpdatedFilenameEpub ());
         }
         catch (Exception $e)
         {
@@ -334,15 +420,8 @@ class Book extends Base {
         if ($this->hasCover)
         {
             array_push ($linkArray, Data::getLink ($this, "jpg", "image/jpeg", Link::OPDS_IMAGE_TYPE, "cover.jpg", NULL));
-            $height = "50";
-            if (preg_match ('/feed.php/', $_SERVER["SCRIPT_NAME"])) {
-                $height = $config['cops_opds_thumbnail_height'];
-            }
-            else
-            {
-                $height = $config['cops_html_thumbnail_height'];
-            }
-            array_push ($linkArray, new Link ("fetch.php?id=$this->id&height=" . $height, "image/jpeg", Link::OPDS_THUMBNAIL_TYPE));
+            
+            array_push ($linkArray, Data::getLink ($this, "jpg", "image/jpeg", Link::OPDS_THUMBNAIL_TYPE, "cover.jpg", NULL));
         }
         
         foreach ($this->getDatas () as $data)
@@ -371,6 +450,12 @@ class Book extends Base {
             $this->getComment (), "text/html", 
             $this->getLinkArray (), $this);
     }
+    
+    public static function getBookCount($database = NULL) {
+        global $config;
+        $nBooks = parent::getDb ($database)->query('select count(*) from books')->fetchColumn();
+        return $nBooks;
+    }
 
     public static function getCount() {
         global $config;
@@ -378,14 +463,16 @@ class Book extends Base {
         $result = array();
         $entry = new Entry (localize ("allbooks.title"), 
                           self::ALL_BOOKS_ID, 
-                          str_format (localize ("allbooks.alphabetical"), $nBooks), "text", 
+                          str_format (localize ("allbooks.alphabetical", $nBooks), $nBooks), "text", 
                           array ( new LinkNavigation ("?page=".parent::PAGE_ALL_BOOKS)));
         array_push ($result, $entry);
-        $entry = new Entry (localize ("recent.title"), 
-                          self::ALL_RECENT_BOOKS_ID, 
-                          str_format (localize ("recent.list"), $config['cops_recentbooks_limit']), "text", 
-                          array ( new LinkNavigation ("?page=".parent::PAGE_ALL_RECENT_BOOKS)));
-        array_push ($result, $entry);
+        if ($config['cops_recentbooks_limit'] > 0) {
+            $entry = new Entry (localize ("recent.title"), 
+                              self::ALL_RECENT_BOOKS_ID, 
+                              str_format (localize ("recent.list"), $config['cops_recentbooks_limit']), "text", 
+                              array ( new LinkNavigation ("?page=".parent::PAGE_ALL_RECENT_BOOKS)));
+            array_push ($result, $entry);
+        }
         return $result;
     }
         
@@ -402,6 +489,10 @@ class Book extends Base {
         return self::getEntryArray (self::SQL_BOOKS_BY_TAG, array ($tagId), $n);
     }
     
+    public static function getBooksByLanguage($languageId, $n) {
+        return self::getEntryArray (self::SQL_BOOKS_BY_LANGUAGE, array ($languageId), $n);
+    }
+
     public static function getBooksByCustom($customId, $id, $n) {
         $query = str_format (self::SQL_BOOKS_BY_CUSTOM, "{0}", "{1}", CustomColumn::getTableLinkName ($customId), CustomColumn::getTableLinkColumn ($customId));
         return self::getEntryArray ($query, array ($id), $n);
@@ -436,8 +527,8 @@ where data.book = books.id and data.id = ?');
         return NULL;
     }
     
-    public static function getBooksByQuery($query, $n) {
-        return self::getEntryArray (self::SQL_BOOKS_QUERY, array ("%" . $query . "%", "%" . $query . "%"), $n);
+    public static function getBooksByQuery($query, $n, $database = NULL) {
+        return self::getEntryArray (self::SQL_BOOKS_QUERY, $query, $n, $database);
     }
     
     public static function getAllBooks() {
@@ -459,8 +550,8 @@ order by substr (upper (sort), 1, 1)");
         return self::getEntryArray (self::SQL_BOOKS_BY_FIRST_LETTER, array ($letter . "%"), $n);
     }
     
-    public static function getEntryArray ($query, $params, $n) {
-        list ($totalNumber, $result) = parent::executeQuery ($query, self::BOOK_COLUMNS, self::getFilterString (), $params, $n);
+    public static function getEntryArray ($query, $params, $n, $database = NULL) {
+        list ($totalNumber, $result) = parent::executeQuery ($query, self::BOOK_COLUMNS, self::getFilterString (), $params, $n, $database);
         $entryArray = array();
         while ($post = $result->fetchObject ())
         {
@@ -478,4 +569,135 @@ order by substr (upper (sort), 1, 1)");
     }
 
 }
-?>
+
+function getJson ($complete = false) {
+    global $config;
+    $page = getURLParam ("page", Base::PAGE_INDEX);
+    $query = getURLParam ("query");
+    $search = getURLParam ("search");
+    $qid = getURLParam ("id");
+    $n = getURLParam ("n", "1");
+    $database = GetUrlParam (DB);
+    
+    if ($search) {
+        $out = array ();
+        $arrayTag = Tag::getAllTagsByQuery ($query);
+        $arraySeries = Serie::getAllSeriesByQuery ($query);
+        $arrayAuthor = Author::getAuthorsByStartingLetter ('%' . $query);
+        list ($arrayBook, $totalNumber) = Book::getBooksByStartingLetter ('%' . $query, -1);
+        
+        foreach (array ("book" => $arrayBook, 
+                        "author" => $arrayAuthor, 
+                        "series" => $arraySeries, 
+                        "tag" => $arrayTag) as $key => $array) {
+            $i = 0;
+            $pagequery = Base::PAGE_OPENSEARCH_QUERY;
+            foreach ($array as $entry) {
+                if (count($array) > 0) {
+                    // Comment to help the perl i18n script
+                    // str_format (localize("bookword", count($array))
+                    // str_format (localize("authorword", count($array)
+                    // str_format (localize("seriesword", count($array)
+                    // str_format (localize("tagword", count($array)
+                    array_push ($out, array ("title" => "<strong>" . str_format (localize("{$key}word", count($array)), count($array)) . "</strong>",
+                                                        "navlink" => "index.php?page={$pagequery}&query={$query}&db={$database}&scope={$key}"));
+                }
+                if ($entry instanceof EntryBook) {
+                    array_push ($out, array ("title" => $entry->title, "navlink" => $entry->book->getDetailUrl ()));
+                } else {
+                    array_push ($out, $entry->getContentArray ());
+                }
+                $i++;
+                if ($i > 4) { break; };
+            }
+        }
+        return $out;
+    }
+    
+    $currentPage = Page::getPage ($page, $qid, $query, $n);
+    $currentPage->InitializeContent ();
+    
+    $out = array ( "title" => $currentPage->title);
+    $entries = array ();
+    foreach ($currentPage->entryArray as $entry) {
+        array_push ($entries, $entry->getContentArray ());
+    }
+    if (!is_null ($currentPage->book)) {
+        $out ["book"] = $currentPage->book->getFullContentArray ();
+    }
+    $out ["databaseId"] = GetUrlParam (DB, "");
+    $out ["databaseName"] = Base::getDbName ();
+    $out ["page"] = $page;
+    $out ["entries"] = $entries;
+    $out ["isPaginated"] = 0;
+    if ($currentPage->isPaginated ()) {
+        $prevLink = $currentPage->getPrevLink ();
+        $nextLink = $currentPage->getNextLink ();
+        $out ["isPaginated"] = 1;
+        $out ["prevLink"] = "";
+        if (!is_null ($prevLink)) {
+            $out ["prevLink"] = $prevLink->hrefXhtml ();
+        }
+        $out ["nextLink"] = "";
+        if (!is_null ($nextLink)) {
+            $out ["nextLink"] = $nextLink->hrefXhtml ();
+        }
+        $out ["maxPage"] = $currentPage->getMaxPage ();
+        $out ["currentPage"] = $currentPage->n;
+    }
+    if (!is_null (getURLParam ("complete")) || $complete) { 
+        $out ["c"] = array ("version" => VERSION, "i18n" => array (
+                       "coverAlt" => localize("i18n.coversection"),
+                       "authorsTitle" => localize("authors.title"),
+                       "bookwordTitle" => localize("bookword.title"),
+                       "tagsTitle" => localize("tags.title"),
+                       "seriesTitle" => localize("series.title"),
+                       "customizeTitle" => localize ("customize.title"),
+                       "aboutTitle" => localize ("about.title"),
+                       "previousAlt" => localize ("paging.previous.alternate"),
+                       "nextAlt" => localize ("paging.next.alternate"),
+                       "searchAlt" => localize ("search.alternate"),
+                       "sortAlt" => localize ("sort.alternate"),
+                       "homeAlt" => localize ("home.alternate"),
+                       "cogAlt" => localize ("cog.alternate"),
+                       "permalinkAlt" => localize ("permalink.alternate"),
+                       "pubdateTitle" => localize("pubdate.title"),
+                       "languagesTitle" => localize("language.title"),
+                       "contentTitle" => localize("content.summary"),
+                       "sortorderAsc" => localize("search.sortorder.asc"),
+                       "sortorderDesc" => localize("search.sortorder.desc"),
+                       "customizeEmail" => localize("customize.email")),
+                   "url" => array (
+                       "detailUrl" => "index.php?page=13&id={0}&db={1}",
+                       "coverUrl" => "fetch.php?id={0}&db={1}",
+                       "thumbnailUrl" => "fetch.php?height=" . $config['cops_html_thumbnail_height'] . "&id={0}&db={1}"),
+                   "config" => array (
+                       "use_fancyapps" => $config ["cops_use_fancyapps"],
+                       "max_item_per_page" => $config['cops_max_item_per_page'],
+                       "server_side_rendering" => useServerSideRendering (),
+                       "html_tag_filter" => $config['cops_html_tag_filter']));
+        if ($config['cops_thumbnail_handling'] == "1") {
+            $out ["c"]["url"]["thumbnailUrl"] = $out ["c"]["url"]["coverUrl"];
+        } else if (!empty ($config['cops_thumbnail_handling'])) {
+            $out ["c"]["url"]["thumbnailUrl"] = $config['cops_thumbnail_handling'];
+        }
+   }
+
+    $out ["containsBook"] = 0;
+    if ($currentPage->containsBook ()) {
+        $out ["containsBook"] = 1;
+    }
+    
+    $out["abouturl"] = "index.php" . addURLParameter ("?page=16", DB, $database);
+    
+    if ($page == Base::PAGE_ABOUT) {
+        $temp = preg_replace ("/\<h1\>About COPS\<\/h1\>/", "<h1>About COPS " . VERSION . "</h1>", file_get_contents('about.html'));
+        $out ["fullhtml"] = $temp;
+    }
+    
+    $out ["homeurl"] = "index.php";
+    if ($page != Base::PAGE_INDEX && !is_null ($database)) $out ["homeurl"] = $out ["homeurl"] .  "?" . addURLParameter ("", DB, $database);
+    
+    return $out;
+}
+

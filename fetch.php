@@ -9,7 +9,14 @@
     require_once ("config.php");
     require_once ("book.php");
     require_once ("data.php");
-     
+
+function notFound () {
+    header($_SERVER["SERVER_PROTOCOL"]." 404 Not Found");
+    header("Status: 404 Not Found");
+
+    $_SERVER['REDIRECT_STATUS'] = 404;
+}
+    
     global $config;
     $expires = 60*60*24*14;
     header("Pragma: public");
@@ -26,6 +33,23 @@
     {
         $book = Book::getBookById($bookId);
     }
+    
+    if (!$book) {
+        notFound ();
+        return;     
+    }
+    
+    if ($book && ($type == "jpg" || empty ($config['calibre_internal_directory']))) {
+        if ($type == "jpg") {
+            $file = $book->getFilePath ($type);
+        } else {
+            $file = $book->getFilePath ($type, $idData);
+        }
+        if (!$file || !file_exists ($file)) {
+            notFound ();
+            return;
+        }
+    }
      
     switch ($type)
     {
@@ -40,6 +64,7 @@
                     $h = $size[1];
                     //set new size
                     $nw = $_GET["width"];
+                    if ($nw > $w) { break; }
                     $nh = ($nw*$h)/$w;
                 }
                 else{
@@ -51,7 +76,7 @@
                 $src_img = imagecreatefromjpeg($file);
                 $dst_img = imagecreatetruecolor($nw,$nh);
                 imagecopyresampled($dst_img, $src_img, 0, 0, 0, 0, $nw, $nh, $w, $h);//resizing the image
-                imagejpeg($dst_img,null,100);
+                imagejpeg($dst_img,null,80);
                 imagedestroy($src_img);
                 imagedestroy($dst_img);
                 return;
@@ -65,6 +90,7 @@
                     $h = $size[1];
                     //set new size
                     $nh = $_GET["height"];
+                    if ($nh > $h) { break; }
                     $nw = ($nh*$w)/$h;
                 }
                 else{
@@ -76,7 +102,7 @@
                 $src_img = imagecreatefromjpeg($file);
                 $dst_img = imagecreatetruecolor($nw,$nh);
                 imagecopyresampled($dst_img, $src_img, 0, 0, 0, 0, $nw, $nh, $w, $h);//resizing the image
-                imagejpeg($dst_img,null,100);
+                imagejpeg($dst_img,null,80);
                 imagedestroy($src_img);
                 imagedestroy($dst_img);
                 return;
@@ -100,7 +126,7 @@
     
     $dir = $config['calibre_internal_directory'];
     if (empty ($config['calibre_internal_directory'])) {
-        $dir = $config['calibre_directory'];
+        $dir = Base::getDbDirectory ();
     }
     
     if (empty ($config['cops_x_accel_redirect'])) {
@@ -112,4 +138,3 @@
     else {
         header ($config['cops_x_accel_redirect'] . ": " . $dir . $file);
     }
-?>

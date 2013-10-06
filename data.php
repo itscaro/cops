@@ -70,6 +70,18 @@ class Data extends Base {
         return $this->name . "." . strtolower ($this->format);
     }
     
+    public function getUpdatedFilename () {
+        return $this->book->getAuthorsName () . " - " . $this->book->title;
+    }
+
+    public function getUpdatedFilenameEpub () {
+        return $this->getUpdatedFilename () . ".epub";
+    }
+
+    public function getUpdatedFilenameKepub () {
+        return $this->getUpdatedFilename () . ".kepub.epub";
+    }
+    
     public function getDataLink ($rel, $title = NULL) {
         return self::getLink ($this->book, $this->extension, $this->getMimeType (), $rel, $this->getFilename (), $this->id, $title);
     }
@@ -83,30 +95,55 @@ class Data extends Base {
         
         if ($config['cops_use_url_rewriting'] == "1")
         {
-            return "download/" . $this->id . "/" . urlencode ($this->getFilename ());
+            $database = "";
+            if (!is_null (GetUrlParam (DB))) $database = GetUrlParam (DB) . "/";
+            if ($config['cops_provide_kepub'] == "1" && preg_match("/Kobo/", $_SERVER['HTTP_USER_AGENT'])) {
+                return "download/" . $this->id . "/" . $database . urlencode ($this->getUpdatedFilenameKepub ());
+            } else {
+                return "download/" . $this->id . "/" . $database . urlencode ($this->getFilename ());
+            }
         }
         else
         {
-            return str_replace ("&", "&amp;", self::getLink ($this->book, $this->extension, $this->getMimeType (), NULL, $this->getFilename (), $this->id, NULL)->href);
+            return self::getLink ($this->book, $this->extension, $this->getMimeType (), NULL, $this->getFilename (), $this->id, NULL)->href;
         }
     }
     
-    public static function getLink ($book, $type, $mime, $rel, $filename, $idData, $title = NULL)
+    public static function getLink ($book, $type, $mime, $rel, $filename, $idData, $title = NULL, $height = NULL)
     {
         global $config;
         
-        $textData = "";
-        if (!is_null ($idData))
-        {
-            $textData = "&data=" . $idData;
-        }
+        $urlParam = addURLParameter("", "data", $idData);
         
-        if (preg_match ('/^\//', $config['calibre_directory']) || // Linux /
-            preg_match ('/^\w\:/', $config['calibre_directory']) || // Windows X:
+        if (preg_match ('/^\//', Base::getDbDirectory ()) || // Linux /
+            preg_match ('/^\w\:/', Base::getDbDirectory ()) || // Windows X:
+            $rel == Link::OPDS_THUMBNAIL_TYPE ||
             ($type == "epub" && $config['cops_update_epub-metadata']))
         {
-            if ($type != "jpg") $textData .= "&type=" . $type;
-            return new Link ("fetch.php?id=$book->id" . $textData, $mime, $rel, $title);
+            if ($type != "jpg") $urlParam = addURLParameter($urlParam, "type", $type);
+            if ($rel == Link::OPDS_THUMBNAIL_TYPE) {
+                if (is_null ($height)) {
+                    if (preg_match ('/feed.php/', $_SERVER["SCRIPT_NAME"])) {
+                        $height = $config['cops_opds_thumbnail_height'];
+                    }
+                    else
+                    {
+                        $height = $config['cops_html_thumbnail_height'];
+                    }
+                }
+                if ($config['cops_thumbnail_handling'] != "1") {
+                    $urlParam = addURLParameter($urlParam, "height", $height);
+                }
+            }
+            $urlParam = addURLParameter($urlParam, "id", $book->id);
+            if (!is_null (GetUrlParam (DB))) $urlParam = addURLParameter ($urlParam, DB, GetUrlParam (DB));
+            if ($config['cops_thumbnail_handling'] != "1" && 
+                !empty ($config['cops_thumbnail_handling']) && 
+                $rel == Link::OPDS_THUMBNAIL_TYPE) {
+                return new Link ($config['cops_thumbnail_handling'], $mime, $rel, $title);
+            } else {
+                return new Link ("fetch.php?" . $urlParam, $mime, $rel, $title);
+            }
         }
         else
         {
@@ -114,4 +151,3 @@ class Data extends Base {
         }
     }
 }
-?>
