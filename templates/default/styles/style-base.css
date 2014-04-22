@@ -7,10 +7,9 @@
     -moz-font-smoothing:antialiased;
     -o-font-smoothing:antialiased;
     font-smoothing:antialiased;
-    text-rendering:optimizeLegibility;
 }
 
-html { font-size: 100%; -webkit-text-size-adjust: 100%; 
+html { font-size: 100%; -webkit-text-size-adjust: 100%;
                           -ms-text-size-adjust: 100%; }
 
 body {
@@ -31,7 +30,7 @@ img {
    Typography stuff goes here
    ========================================================================== */
 h1,h2,h3,h4,h5,h6 { font-weight: bold; margin:0; padding:0;}
-/*h1 see mediaqueries*/ 
+/*h1 see mediaqueries*/
 h2 {font-size: 1.2em;}
 h3 {font-size: 1.1em;}
 h4 {font-size: 1.0em; }
@@ -53,6 +52,7 @@ a:hover { color:#000; text-decoration: none; }
   width: auto;
   max-width: 700px;
   margin: 20px auto;
+  min-height: 198px;
 }
 
 #email {
@@ -72,7 +72,11 @@ margin: 0;
 padding: 0;
 list-style-type: none;
 text-align: left;
-text-transform:none; 
+text-transform:none;
+}
+
+#filter ul li {
+cursor: pointer;
 }
 
 li {
@@ -84,16 +88,23 @@ background-color: white;
 opacity: 0.5;
 }
 
-.filter-include { 
+.filter-include {
     border-left:thick solid blue;
     opacity: 1;
 }
 
-.filter-exclude { 
+.filter-include:after {
+    content: " \2713"; /* Tick mark */
+}
+
+.filter-exclude {
     border-right:thick solid red;
     opacity: 1;
 }
 
+.filter-exclude:after {
+    content: " \2717"; /* Check mark */
+}
 
 img
 {
@@ -113,10 +124,10 @@ border:0;
    Header stuff goes here
    ========================================================================== */
 header {
-    clear:both; 
-    color:white; 
-    text-align:center; 
-    text-transform:uppercase; 
+    clear:both;
+    color:white;
+    text-align:center;
+    text-transform:uppercase;
     display:block;
     min-height:70px;
 }
@@ -125,7 +136,7 @@ header {
     display:inline-block;
     color:lightgray;
     text-align: center;
-    vertical-align: bottom;
+    margin: 0 2px;
 }
 
 .submit {
@@ -134,6 +145,7 @@ header {
     background-color: transparent;
     background-image: none;
     border-color: transparent;
+    display: table-cell;
 }
 
 .hicon64{
@@ -144,8 +156,6 @@ header {
 }
 
 .hicon32{
-    font-size: 24px;
-    line-height: 32px;
     width: 32px;
     height: 32px;
 }
@@ -234,7 +244,7 @@ max-width:800px;
 }
 
 .download a {
-    background: darkgray;  
+    background: darkgray;
     color: #EEE;
     text-decoration : none;
     font-weight: bold;
@@ -253,7 +263,7 @@ max-width:800px;
 
 /*-------------books popup article-------------*/
 .bookpopup h2{
-    margin: 15px 15px; 
+    margin: 15px 15px;
 }
 
 .bookpopup h3{
@@ -270,6 +280,7 @@ max-width:800px;
 
 section .bookpopup{
     padding: 8px 8px;
+    min-height: 175px;
 }
 
 /* =============================================================================
@@ -314,21 +325,24 @@ line-height: 100%;
 
 /* =============================================================================
    Aside stuff goes here
-   ========================================================================== */   
+   ========================================================================== */
 #tool
 {
 width:100%;
-overflow: hidden;
 }
 
 
 /*-------------Search Aside-------------*/
-#tool input[type=search]
+#tool input[type=text], .twitter-typeahead
 {
 vertical-align: middle;
 width: 100%;
-margin: 3px;
+color: black;
 }
+
+.tt-hint, .tt-query {
+    width: 100%;
+    }
 
 .stop select
 {
@@ -341,10 +355,45 @@ margin: 4px;
 cursor:pointer;
 }
 
+#searchForm {
+display: table;
+padding: 0 2px;
+}
+
 .stop
 {
-display: block;
-overflow: hidden;
+display: table-cell;
+vertical-align: middle;
+width: 100%;
+}
+
+.tt-dropdown-menu {
+  width: 322px;
+  text-align: left;
+  margin-top: 6px;
+  color: #000066;
+  padding: 4px 0;
+  background-color: #fff;
+  border: 1px solid #ccc;
+}
+
+.tt-header {
+    border-bottom: 1px solid #CCCCCC;
+    font-weight: bold;
+}
+
+.tt-suggestion {
+  padding: 3px 20px;
+  line-height: 14px;
+}
+
+.tt-suggestion.tt-cursor {
+  color: #1c1c1c;
+  background-color: #778899;
+}
+
+.tt-suggestion p {
+  margin: 0;
 }
 
 /* =============================================================================
@@ -355,7 +404,7 @@ overflow: hidden;
 h1 {font-size: 1em;}
 .container { width:100%; }
 }
-   
+
 /* 320px and greater */
 @media only screen and (min-width: 320px) {
 h1 {font-size: 1.2em;}
@@ -372,7 +421,7 @@ body {  font-size: 1em;/*12px/16px */
 /* 768px and greater */
 @media only screen and (min-width: 768px) {
 h1 {font-size: 2em; line-height: 1em;}
-body {  margin: 5px; 
+body {  margin: 5px;
             font-size: 0.85em;/*12px/16px */
             font-weight:400; /* Better supported than 'lighter' attribute */
     }

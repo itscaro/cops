@@ -7,22 +7,19 @@
  */
 
 require_once ("base.php");
- 
+
 class OPDSRenderer
 {
-    const PAGE_OPENSEARCH = "8";
-    const PAGE_OPENSEARCH_QUERY = "9";
-
     private $xmlStream = NULL;
     private $updated = NULL;
-    
+
     private function getUpdatedTime () {
         if (is_null ($this->updated)) {
             $this->updated = time();
         }
         return date (DATE_ATOM, $this->updated);
     }
-    
+
     private function getXmlStream () {
         if (is_null ($this->xmlStream)) {
             $this->xmlStream = new XMLWriter();
@@ -31,7 +28,7 @@ class OPDSRenderer
         }
         return $this->xmlStream;
     }
-    
+
     public function getOpenSearch () {
         global $config;
         $xml = new XMLWriter ();
@@ -74,7 +71,7 @@ class OPDSRenderer
         $xml->endDocument();
         return $xml->outputMemory(true);
     }
-    
+
     private function startXmlDocument ($page) {
         global $config;
         self::getXmlStream ()->startDocument('1.0','UTF-8');
@@ -97,7 +94,7 @@ class OPDSRenderer
                 if ($page->idPage)
                 {
                     $idPage = $page->idPage;
-                    if (!is_null (GetUrlParam (DB))) $idPage = GetUrlParam (DB) . ":" . $idPage;
+                    if (!is_null (GetUrlParam (DB))) $idPage = str_replace ("cops:", "cops:" . GetUrlParam (DB) . ":", $idPage);
                     self::getXmlStream ()->text ($idPage);
                 }
                 else
@@ -113,46 +110,50 @@ class OPDSRenderer
             self::getXmlStream ()->endElement ();
             self::getXmlStream ()->startElement ("author");
                 self::getXmlStream ()->startElement ("name");
-                    self::getXmlStream ()->text (utf8_encode ("Sébastien Lucas"));
+                    self::getXmlStream ()->text ($page->authorName);
                 self::getXmlStream ()->endElement ();
                 self::getXmlStream ()->startElement ("uri");
-                    self::getXmlStream ()->text ("http://blog.slucas.fr");
+                    self::getXmlStream ()->text ($page->authorUri);
                 self::getXmlStream ()->endElement ();
                 self::getXmlStream ()->startElement ("email");
-                    self::getXmlStream ()->text ("sebastien@slucas.fr");
+                    self::getXmlStream ()->text ($page->authorEmail);
                 self::getXmlStream ()->endElement ();
             self::getXmlStream ()->endElement ();
             $link = new LinkNavigation ("", "start", "Home");
             self::renderLink ($link);
-            $link = new LinkNavigation ("?" . $_SERVER['QUERY_STRING'], "self");
+            $link = new LinkNavigation ("?" . getQueryString (), "self");
             self::renderLink ($link);
-            $urlparam = "?page=" . self::PAGE_OPENSEARCH;
+            $urlparam = "?";
             if (!is_null (GetUrlParam (DB))) $urlparam = addURLParameter ($urlparam, DB, GetUrlParam (DB));
             if ($config['cops_generate_invalid_opds_stream'] == 0 || preg_match("/(MantanoReader|FBReader)/", $_SERVER['HTTP_USER_AGENT'])) {
                 // Good and compliant way of handling search
+                $urlparam = addURLParameter ($urlparam, "page", Base::PAGE_OPENSEARCH);
                 $link = new Link ("feed.php" . $urlparam, "application/opensearchdescription+xml", "search", "Search here");
             }
             else
             {
                 // Bad way, will be removed when OPDS client are fixed
+                $urlparam = addURLParameter ($urlparam, "query", "{searchTerms}");
+                $urlparam = str_replace ("%7B", "{", $urlparam);
+                $urlparam = str_replace ("%7D", "}", $urlparam);
                 $link = new Link ($config['cops_full_url'] . 'feed.php' . $urlparam, "application/atom+xml", "search", "Search here");
             }
             self::renderLink ($link);
             if ($page->containsBook () && !is_null ($config['cops_books_filter']) && count ($config['cops_books_filter']) > 0) {
                 $Urlfilter = getURLParam ("tag", "");
                 foreach ($config['cops_books_filter'] as $lib => $filter) {
-                    $link = new LinkFacet ("?" . addURLParameter ($_SERVER['QUERY_STRING'], "tag", $filter), $lib, localize ("tagword.title"), $filter == $Urlfilter);
+                    $link = new LinkFacet ("?" . addURLParameter (getQueryString (), "tag", $filter), $lib, localize ("tagword.title"), $filter == $Urlfilter);
                     self::renderLink ($link);
                 }
             }
     }
-        
+
     private function endXmlDocument () {
         self::getXmlStream ()->endElement ();
         self::getXmlStream ()->endDocument ();
         return self::getXmlStream ()->outputMemory(true);
     }
-    
+
     private function renderLink ($link) {
         self::getXmlStream ()->startElement ("link");
             self::getXmlStream ()->writeAttribute ("href", $link->href);
@@ -172,7 +173,7 @@ class OPDSRenderer
         self::getXmlStream ()->endElement ();
     }
 
-    
+
     private function renderEntry ($entry) {
         self::getXmlStream ()->startElement ("title");
             self::getXmlStream ()->text ($entry->title);
@@ -194,11 +195,11 @@ class OPDSRenderer
         foreach ($entry->linkArray as $link) {
             self::renderLink ($link);
         }
-        
+
         if (get_class ($entry) != "EntryBook") {
             return;
         }
-        
+
         foreach ($entry->book->getAuthors () as $author) {
             self::getXmlStream ()->startElement ("author");
                 self::getXmlStream ()->startElement ("name");
@@ -223,7 +224,7 @@ class OPDSRenderer
                 self::getXmlStream ()->text (date ("Y-m-d", $entry->book->pubdate) . "T08:08:08Z");
             self::getXmlStream ()->endElement ();
         }
-        
+
         $lang = $entry->book->getLanguages ();
         if (!empty ($lang)) {
             self::getXmlStream ()->startElement ("dcterms:language");
@@ -232,7 +233,7 @@ class OPDSRenderer
         }
 
     }
-    
+
     public function render ($page) {
         global $config;
         self::startXmlDocument ($page);
@@ -264,4 +265,4 @@ class OPDSRenderer
         return self::endXmlDocument ();
     }
 }
- 
+
