@@ -187,7 +187,7 @@ class Book extends Base {
             $result->execute (array ($this->id));
             while ($post = $result->fetchObject ())
             {
-                array_push ($this->tags, new Tag ($post->id, $post->name));
+                array_push ($this->tags, new Tag ($post));
             }
         }
         return $this->tags;
@@ -228,7 +228,7 @@ class Book extends Base {
 
     public function GetMostInterestingDataToSendToKindle ()
     {
-        $bestFormatForKindle = array ("EPUB", "PDF", "MOBI");
+        $bestFormatForKindle = array ("EPUB", "PDF", "AZW3", "MOBI");
         $bestRank = -1;
         $bestData = NULL;
         foreach ($this->getDatas () as $data) {
@@ -428,24 +428,23 @@ class Book extends Base {
     }
 
     public static function getBookCount($database = NULL) {
-        $nBooks = parent::getDb ($database)->query('select count(*) from books')->fetchColumn();
-        return $nBooks;
+        return parent::executeQuerySingle ('select count(*) from books', $database);
     }
 
     public static function getCount() {
         global $config;
-        $nBooks = parent::getDb ()->query('select count(*) from books')->fetchColumn();
+        $nBooks = parent::executeQuerySingle ('select count(*) from books');
         $result = array();
         $entry = new Entry (localize ("allbooks.title"),
                           self::ALL_BOOKS_ID,
                           str_format (localize ("allbooks.alphabetical", $nBooks), $nBooks), "text",
-                          array ( new LinkNavigation ("?page=".parent::PAGE_ALL_BOOKS)));
+                          array ( new LinkNavigation ("?page=".parent::PAGE_ALL_BOOKS)), "", $nBooks);
         array_push ($result, $entry);
         if ($config['cops_recentbooks_limit'] > 0) {
             $entry = new Entry (localize ("recent.title"),
                               self::ALL_RECENT_BOOKS_ID,
                               str_format (localize ("recent.list"), $config['cops_recentbooks_limit']), "text",
-                              array ( new LinkNavigation ("?page=".parent::PAGE_ALL_RECENT_BOOKS)));
+                              array ( new LinkNavigation ("?page=".parent::PAGE_ALL_RECENT_BOOKS)), "", $config['cops_recentbooks_limit']);
             array_push ($result, $entry);
         }
         return $result;
@@ -548,7 +547,7 @@ order by substr (upper (sort), 1, 1)", "substr (upper (sort), 1, 1) as title, co
         {
             array_push ($entryArray, new Entry ($post->title, Book::getEntryIdByLetter ($post->title),
                 str_format (localize("bookword", $post->count), $post->count), "text",
-                array ( new LinkNavigation ("?page=".parent::PAGE_ALL_BOOKS_LETTER."&id=". rawurlencode ($post->title)))));
+                array ( new LinkNavigation ("?page=".parent::PAGE_ALL_BOOKS_LETTER."&id=". rawurlencode ($post->title))), "", $post->count));
         }
         return $entryArray;
     }

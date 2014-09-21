@@ -6,7 +6,7 @@
  * @author     S�bastien Lucas <sebastien@slucas.fr>
  */
 
-define ("VERSION", "1.0.0RC2");
+define ("VERSION", "1.0.0RC3");
 define ("DB", "db");
 date_default_timezone_set($config['default_timezone']);
 
@@ -31,6 +31,11 @@ function serverSideRender ($data) {
                                               "header" => $header,
                                               "footer" => $footer,
                                               "main" => $main));
+    // If there is a syntax error in the function created
+    // $dot will be equal to FALSE
+    if (!$dot) {
+        return FALSE;
+    }
     // Execute the template
     if (!empty ($data)) {
         return $dot ($data);
@@ -72,6 +77,9 @@ function getCurrentOption ($option) {
     if ($option == "style") {
         return "default";
     }
+    if ($option == "template") {
+        return "default";
+    }
 
     if (isset($config ["cops_" . $option])) {
         return $config ["cops_" . $option];
@@ -85,7 +93,7 @@ function getCurrentCss () {
 }
 
 function getCurrentTemplate () {
-    return "default";
+    return getCurrentOption ("template");
 }
 
 function getUrlWithVersion ($url) {
@@ -390,6 +398,7 @@ class Entry
     public $title;
     public $id;
     public $content;
+    public $numberOfElement;
     public $contentType;
     public $linkArray;
     public $localUpdated;
@@ -427,7 +436,7 @@ class Entry
         return "#";
     }
 
-    public function __construct($ptitle, $pid, $pcontent, $pcontentType, $plinkArray, $pclass = "") {
+    public function __construct($ptitle, $pid, $pcontent, $pcontentType, $plinkArray, $pclass = "", $pcount = 0) {
         global $config;
         $this->title = $ptitle;
         $this->id = $pid;
@@ -435,6 +444,7 @@ class Entry
         $this->contentType = $pcontentType;
         $this->linkArray = $plinkArray;
         $this->className = $pclass;
+        $this->numberOfElement = $pcount;
 
         if ($config['cops_show_icons'] == 1)
         {
@@ -571,7 +581,7 @@ class Page
                 $nBooks = Book::getBookCount ($i);
                 array_push ($this->entryArray, new Entry ($key, "cops:{$i}:catalog",
                                         str_format (localize ("bookword", $nBooks), $nBooks), "text",
-                                        array ( new LinkNavigation ("?" . DB . "={$i}"))));
+                                        array ( new LinkNavigation ("?" . DB . "={$i}")), "", $nBooks));
                 $i++;
                 Base::clearDb ();
             }
@@ -947,7 +957,7 @@ class PageQueryResult extends Page
                     array_push ($this->entryArray, new Entry (str_format (localize ("search.result.{$key}"), $this->query), DB . ":query:{$d}:{$key}",
                                         str_format (localize("{$key}word", $total), $total), "text",
                                         array ( new LinkNavigation ("?page={$pagequery}&query={$query}&db={$d}&scope={$key}")),
-                                        Base::noDatabaseSelected () ? "" : "tt-header"));
+                                        Base::noDatabaseSelected () ? "" : "tt-header", $total));
                 }
                 if (!Base::noDatabaseSelected () && $this->useTypeahead ()) {
                     foreach ($array as $entry) {
@@ -990,7 +1000,7 @@ class PageQueryResult extends Page
                 list ($array, $totalNumber) = Book::getBooksByQuery (array ("all" => $crit), 1, $i, 1);
                 array_push ($this->entryArray, new Entry ($key, DB . ":query:{$i}",
                                         str_format (localize ("bookword", $totalNumber), $totalNumber), "text",
-                                        array ( new LinkNavigation ("?" . DB . "={$i}&page=9&query=" . $this->query))));
+                                        array ( new LinkNavigation ("?" . DB . "={$i}&page=9&query=" . $this->query)), "", $totalNumber));
                 $i++;
             }
             return;
@@ -1072,6 +1082,9 @@ class PageCustomize extends Page
                                    "language");
 
         $content = "";
+        array_push ($this->entryArray, new Entry ("Template", "",
+                                        "<span style='cursor: pointer;' onclick='$.cookie(\"template\", \"bootstrap\", { expires: 365 });window.location=$(\".headleft\").attr(\"href\");'>Click to switch to Bootstrap</span>", "text",
+                                        array ()));
         if (!preg_match("/(Kobo|Kindle\/3.0|EBRD1101)/", $_SERVER['HTTP_USER_AGENT'])) {
             $content .= '<select id="style" onchange="updateCookie (this);">';
             foreach ($this-> getStyleList () as $filename) {
@@ -1246,6 +1259,40 @@ abstract class Base
 
     public static function clearDb () {
         self::$db = NULL;
+    }
+
+    public static function executeQuerySingle ($query, $database = NULL) {
+        return self::getDb ($database)->query($query)->fetchColumn();
+    }
+
+    public static function getCountGeneric($table, $id, $pageId, $numberOfString = NULL) {
+        if (!$numberOfString) {
+            $numberOfString = $table . ".alphabetical";
+        }
+        $count = self::executeQuerySingle ('select count(*) from ' . $table);
+        if ($count == 0) return NULL;
+        $entry = new Entry (localize($table . ".title"), $id,
+            str_format (localize($numberOfString, $count), $count), "text",
+            array ( new LinkNavigation ("?page=".$pageId)), "", $count);
+        return $entry;
+    }
+
+    public static function getEntryArrayWithBookNumber ($query, $columns, $params, $category) {
+        list (, $result) = self::executeQuery ($query, $columns, "", $params, -1);
+        $entryArray = array();
+        while ($post = $result->fetchObject ())
+        {
+            $instance = new $category ($post);
+            if (property_exists($post, "sort")) {
+                $title = $post->sort;
+            } else {
+                $title = $post->name;
+            }
+            array_push ($entryArray, new Entry ($title, $instance->getEntryId (),
+                str_format (localize("bookword", $post->count), $post->count), "text",
+                array ( new LinkNavigation ($instance->getUri ())), "", $post->count));
+        }
+        return $entryArray;
     }
 
     public static function executeQuery($query, $columns, $filter, $params, $n, $database = NULL, $numberPerPage = NULL) {

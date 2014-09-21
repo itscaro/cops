@@ -102,7 +102,7 @@ class JSONRenderer
             $out ["book"] = self::getBookContentArray ($entry->book);
             return $out;
         }
-        return array ( "title" => $entry->title, "content" => $entry->content, "navlink" => $entry->getNavLink () );
+        return array ( "title" => $entry->title, "content" => $entry->content, "navlink" => $entry->getNavLink (), "number" => $entry->numberOfElement );
     }
 
     public static function getContentArrayTypeahead ($page) {
@@ -154,12 +154,16 @@ class JSONRenderer
                        "config" => array (
                            "use_fancyapps" => $config ["cops_use_fancyapps"],
                            "max_item_per_page" => $config['cops_max_item_per_page'],
+                           "kindleHack"        => "",
                            "server_side_rendering" => useServerSideRendering (),
                            "html_tag_filter" => $config['cops_html_tag_filter']));
         if ($config['cops_thumbnail_handling'] == "1") {
             $out ["c"]["url"]["thumbnailUrl"] = $out ["c"]["url"]["coverUrl"];
         } else if (!empty ($config['cops_thumbnail_handling'])) {
             $out ["c"]["url"]["thumbnailUrl"] = $config['cops_thumbnail_handling'];
+        }
+        if (preg_match("/./", $_SERVER['HTTP_USER_AGENT'])) {
+          $out ["c"]["config"]["kindleHack"] = 'style="text-decoration: none !important;"';
         }
         return $out;
     }
@@ -190,6 +194,13 @@ class JSONRenderer
         }
         $out ["databaseId"] = GetUrlParam (DB, "");
         $out ["databaseName"] = Base::getDbName ();
+        if ($out ["databaseId"] == "") {
+            $out ["databaseName"] = "";
+        }
+        $out ["fullTitle"] = $out ["title"];
+        if ($out ["databaseId"] != "" && $out ["databaseName"] != $out ["fullTitle"]) {
+            $out ["fullTitle"] = $out ["databaseName"] . " > " . $out ["fullTitle"];
+        }
         $out ["page"] = $page;
         $out ["multipleDatabase"] = Base::isMultipleDatabaseEnabled () ? 1 : 0;
         $out ["entries"] = $entries;
