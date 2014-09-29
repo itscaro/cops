@@ -265,3 +265,6 @@
      * 0 : No
      */
     $config ['cops_normalized_search'] = "0";
+
+    $config ['cops_style'] = "eink";
+    $config ['cops_template'] = "default";
