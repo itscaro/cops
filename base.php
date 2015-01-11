@@ -6,7 +6,7 @@
  * @author     S�bastien Lucas <sebastien@slucas.fr>
  */
 
-define ("VERSION", "1.0.0RC3");
+define ("VERSION", "1.0.0RC4");
 define ("DB", "db");
 date_default_timezone_set($config['default_timezone']);
 
@@ -73,6 +73,10 @@ function getCurrentOption ($option) {
         } else {
             return $_COOKIE[$option];
         }
+    }
+
+    if ($option == "style") {
+        return "default";
     }
 
     if (isset($config ["cops_" . $option])) {
@@ -189,6 +193,7 @@ function str_format($format) {
  * http://www.mind-it.info/2010/02/22/a-simple-approach-to-localization-in-php/
  */
 function localize($phrase, $count=-1, $reset=false) {
+    global $config;
     if ($count == 0)
         $phrase .= ".none";
     if ($count == 1)
@@ -204,8 +209,10 @@ function localize($phrase, $count=-1, $reset=false) {
     /* If no instance of $translations has occured load the language file */
     if (is_null($translations)) {
         $lang = "en";
-        if (isset($_SERVER['HTTP_ACCEPT_LANGUAGE']))
-        {
+        if (!empty($config['cops_language'])) {
+            $lang = $config['cops_language'];
+        }
+        elseif (isset($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
             $lang = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
         }
         $lang_file_en = NULL;

@@ -260,6 +260,7 @@
     $config ['cops_fetch_protect'] = "0";
 
     /*
+     * WARNING NOT READY FOR PRODUCTION USE
      * Make the search better (don't care about diacritics, uppercase should work on Cyrillic) but slower.
      * 1 : Yes (enable)
      * 0 : No
@@ -268,3 +269,24 @@
 
     $config ['cops_style'] = "eink";
     $config ['cops_template'] = "default";
+
+    /*
+     * Enable PHP password protection (You can use if htpasswd is not possible for you)
+     * If possible prefer htpasswd !
+     * array( "username" => "xxx", "password" => "secret") : Enable PHP password protection
+     * NULL : Disable PHP password protection (You can still use htpasswd)
+     */
+    $config['cops_basic_authentication'] = NULL;
+
+    /*
+     * Which template is used by default :
+     * 'default'
+     * 'bootstrap'
+     */
+    $config['cops_template'] = 'default';
+
+    /*
+     * Set language code to force a language (see lang/ directory for available languages).
+     * When empty it will auto detect the language.
+     */
+    $config['cops_language'] = '';
