@@ -1265,6 +1265,9 @@ abstract class Base
         global $config;
         if (self::isMultipleDatabaseEnabled ()) {
             if (is_null ($database)) $database = GetUrlParam (DB, 0);
+            if (!is_null($database) && !preg_match('/^\d+$/', $database)) {
+                return self::error ($database);
+            }
             $array = array_keys ($config['calibre_directory']);
             return  $array[$database];
         }
@@ -1275,6 +1278,9 @@ abstract class Base
         global $config;
         if (self::isMultipleDatabaseEnabled ()) {
             if (is_null ($database)) $database = GetUrlParam (DB, 0);
+            if (!is_null($database) && !preg_match('/^\d+$/', $database)) {
+                return self::error ($database);
+            }
             $array = array_values ($config['calibre_directory']);
             return  $array[$database];
         }
@@ -1286,11 +1292,11 @@ abstract class Base
         return self::getDbDirectory ($database) .'metadata.db';
     }
 
-    private static function error () {
+    private static function error ($database) {
         if (php_sapi_name() != "cli") {
             header("location: checkconfig.php?err=1");
         }
-        throw new Exception('Database not found.');
+        throw new Exception("Database <{$database}> not found.");
     }
 
     public static function getDb ($database = NULL) {
@@ -1302,10 +1308,10 @@ abstract class Base
                         self::$db->sqliteCreateFunction ('normAndUp', 'normAndUp', 1);
                     }
                 } else {
-                    self::error ();
+                    self::error ($database);
                 }
             } catch (Exception $e) {
-                self::error ();
+                self::error ($database);
             }
         }
         return self::$db;
