@@ -3,10 +3,12 @@
  * COPS (Calibre OPDS PHP Server) class file
  *
  * @license    GPL 2 (http://www.gnu.org/licenses/gpl.html)
- * @author     S�bastien Lucas <sebastien@slucas.fr>
+ * @author     Sébastien Lucas <sebastien@slucas.fr>
  */
 
-define ("VERSION", "1.0.0RC4");
+/** @var array $config */
+
+define ("VERSION", "1.0.2");
 define ("DB", "db");
 date_default_timezone_set($config['default_timezone']);
 
@@ -74,11 +76,9 @@ function getCurrentOption ($option) {
             return $_COOKIE[$option];
         }
     }
-
     if ($option == "style") {
         return "default";
     }
-
     if (isset($config ["cops_" . $option])) {
         return $config ["cops_" . $option];
     }
@@ -332,79 +332,16 @@ function addURLParameter($urlParams, $paramName, $paramValue) {
 
 function useNormAndUp () {
     global $config;
-    return extension_loaded('mbstring') &&
-           extension_loaded('intl') &&
-           class_exists("Normalizer", $autoload = false) &&
-           $config ['cops_normalized_search'] == "1";
+    return $config ['cops_normalized_search'] == "1";
 }
 
-function normalizeUtf8String( $s)
-{
-    $original_string = $s;
-
-    // maps German (umlauts) and other European characters onto two characters before just removing diacritics
-    $s    = preg_replace( '@\x{00c4}@u'    , "AE",    $s );    // umlaut Ä => AE
-    $s    = preg_replace( '@\x{00d6}@u'    , "OE",    $s );    // umlaut Ö => OE
-    $s    = preg_replace( '@\x{00dc}@u'    , "UE",    $s );    // umlaut Ü => UE
-    $s    = preg_replace( '@\x{00e4}@u'    , "ae",    $s );    // umlaut ä => ae
-    $s    = preg_replace( '@\x{00f6}@u'    , "oe",    $s );    // umlaut ö => oe
-    $s    = preg_replace( '@\x{00fc}@u'    , "ue",    $s );    // umlaut ü => ue
-    $s    = preg_replace( '@\x{00f1}@u'    , "ny",    $s );    // ñ => ny
-    $s    = preg_replace( '@\x{00ff}@u'    , "yu",    $s );    // ÿ => yu
-
-
-    // maps special characters (characters with diacritics) on their base-character followed by the diacritical mark
-        // exmaple:  Ú => U´,  á => a`
-    $s    = Normalizer::normalize( $s, Normalizer::FORM_D );
-
-
-    $s    = preg_replace( '@\pM@u'        , "",    $s );    // removes diacritics
-
-
-    $s    = preg_replace( '@\x{00df}@u'    , "ss",    $s );    // maps German ß onto ss
-    $s    = preg_replace( '@\x{00c6}@u'    , "AE",    $s );    // Æ => AE
-    $s    = preg_replace( '@\x{00e6}@u'    , "ae",    $s );    // æ => ae
-    $s    = preg_replace( '@\x{0132}@u'    , "IJ",    $s );    // ? => IJ
-    $s    = preg_replace( '@\x{0133}@u'    , "ij",    $s );    // ? => ij
-    $s    = preg_replace( '@\x{0152}@u'    , "OE",    $s );    // Œ => OE
-    $s    = preg_replace( '@\x{0153}@u'    , "oe",    $s );    // œ => oe
-
-    $s    = preg_replace( '@\x{00d0}@u'    , "D",    $s );    // Ð => D
-    $s    = preg_replace( '@\x{0110}@u'    , "D",    $s );    // Ð => D
-    $s    = preg_replace( '@\x{00f0}@u'    , "d",    $s );    // ð => d
-    $s    = preg_replace( '@\x{0111}@u'    , "d",    $s );    // d => d
-    $s    = preg_replace( '@\x{0126}@u'    , "H",    $s );    // H => H
-    $s    = preg_replace( '@\x{0127}@u'    , "h",    $s );    // h => h
-    $s    = preg_replace( '@\x{0131}@u'    , "i",    $s );    // i => i
-    $s    = preg_replace( '@\x{0138}@u'    , "k",    $s );    // ? => k
-    $s    = preg_replace( '@\x{013f}@u'    , "L",    $s );    // ? => L
-    $s    = preg_replace( '@\x{0141}@u'    , "L",    $s );    // L => L
-    $s    = preg_replace( '@\x{0140}@u'    , "l",    $s );    // ? => l
-    $s    = preg_replace( '@\x{0142}@u'    , "l",    $s );    // l => l
-    $s    = preg_replace( '@\x{014a}@u'    , "N",    $s );    // ? => N
-    $s    = preg_replace( '@\x{0149}@u'    , "n",    $s );    // ? => n
-    $s    = preg_replace( '@\x{014b}@u'    , "n",    $s );    // ? => n
-    $s    = preg_replace( '@\x{00d8}@u'    , "O",    $s );    // Ø => O
-    $s    = preg_replace( '@\x{00f8}@u'    , "o",    $s );    // ø => o
-    $s    = preg_replace( '@\x{017f}@u'    , "s",    $s );    // ? => s
-    $s    = preg_replace( '@\x{00de}@u'    , "T",    $s );    // Þ => T
-    $s    = preg_replace( '@\x{0166}@u'    , "T",    $s );    // T => T
-    $s    = preg_replace( '@\x{00fe}@u'    , "t",    $s );    // þ => t
-    $s    = preg_replace( '@\x{0167}@u'    , "t",    $s );    // t => t
-
-    // remove all non-ASCii characters
-    $s    = preg_replace( '@[^\0-\x80]@u'    , "",    $s );
-
-
-    // possible errors in UTF8-regular-expressions
-    if (empty($s))
-        return $original_string;
-    else
-        return $s;
+function normalizeUtf8String( $s) {
+    include_once 'transliteration.php';
+    return _transliteration_process($s);
 }
 
-function normAndUp ($a) {
-    return mb_strtoupper (normalizeUtf8String($a), 'UTF-8');
+function normAndUp ($s) {
+    return mb_strtoupper (normalizeUtf8String($s), 'UTF-8');
 }
 
 class Link
@@ -434,6 +371,11 @@ class Link
     public function hrefXhtml () {
         return $this->href;
     }
+
+    public function getScriptName() {
+        $parts = explode('/', $_SERVER["SCRIPT_NAME"]);
+        return $parts[count($parts) - 1];
+    }
 }
 
 class LinkNavigation extends Link
@@ -442,10 +384,10 @@ class LinkNavigation extends Link
         parent::__construct ($phref, Link::OPDS_NAVIGATION_TYPE, $prel, $ptitle);
         if (!is_null (GetUrlParam (DB))) $this->href = addURLParameter ($this->href, DB, GetUrlParam (DB));
         if (!preg_match ("#^\?(.*)#", $this->href) && !empty ($this->href)) $this->href = "?" . $this->href;
-        if (preg_match ("/(bookdetail|getJSON).php/", $_SERVER["SCRIPT_NAME"])) {
+        if (preg_match ("/(bookdetail|getJSON).php/", parent::getScriptName())) {
             $this->href = "index.php" . $this->href;
         } else {
-            $this->href = $_SERVER["SCRIPT_NAME"] . $this->href;
+            $this->href = parent::getScriptName() . $this->href;
         }
     }
 }
@@ -455,7 +397,7 @@ class LinkFacet extends Link
     public function __construct($phref, $ptitle = NULL, $pfacetGroup = NULL, $pactiveFacet = FALSE) {
         parent::__construct ($phref, Link::OPDS_PAGING_TYPE, "http://opds-spec.org/facet", $ptitle, $pfacetGroup, $pactiveFacet);
         if (!is_null (GetUrlParam (DB))) $this->href = addURLParameter ($this->href, DB, GetUrlParam (DB));
-        $this->href = $_SERVER["SCRIPT_NAME"] . $this->href;
+        $this->href = parent::getScriptName() . $this->href;
     }
 }
 
@@ -472,15 +414,16 @@ class Entry
     private static $updated = NULL;
 
     public static $icons = array(
-        Author::ALL_AUTHORS_ID       => 'images/author.png',
-        Serie::ALL_SERIES_ID         => 'images/serie.png',
-        Book::ALL_RECENT_BOOKS_ID    => 'images/recent.png',
-        Tag::ALL_TAGS_ID             => 'images/tag.png',
-        Language::ALL_LANGUAGES_ID   => 'images/language.png',
-        CustomColumn::ALL_CUSTOMS_ID => 'images/tag.png',
-        "cops:books$"             => 'images/allbook.png',
-        "cops:books:letter"       => 'images/allbook.png',
-        Publisher::ALL_PUBLISHERS_ID => 'images/publisher.png'
+        Author::ALL_AUTHORS_ID           => 'images/author.png',
+        Serie::ALL_SERIES_ID             => 'images/serie.png',
+        Book::ALL_RECENT_BOOKS_ID        => 'images/recent.png',
+        Tag::ALL_TAGS_ID                 => 'images/tag.png',
+        Language::ALL_LANGUAGES_ID       => 'images/language.png',
+        CustomColumnType::ALL_CUSTOMS_ID => 'images/custom.png',
+        Rating::ALL_RATING_ID            => 'images/rating.png',
+        "cops:books$"                    => 'images/allbook.png',
+        "cops:books:letter"              => 'images/allbook.png',
+        Publisher::ALL_PUBLISHERS_ID     => 'images/publisher.png'
     );
 
     public function getUpdatedTime () {
@@ -495,6 +438,8 @@ class Entry
 
     public function getNavLink () {
         foreach ($this->linkArray as $link) {
+            /* @var $link LinkNavigation */
+
             if ($link->type != Link::OPDS_NAVIGATION_TYPE) { continue; }
 
             return $link->hrefXhtml ();
@@ -531,6 +476,15 @@ class EntryBook extends Entry
 {
     public $book;
 
+    /**
+     * EntryBook constructor.
+     * @param string $ptitle
+     * @param integer $pid
+     * @param string $pcontent
+     * @param string $pcontentType
+     * @param array $plinkArray
+     * @param Book $pbook
+     */
     public function __construct($ptitle, $pid, $pcontent, $pcontentType, $plinkArray, $pbook) {
         parent::__construct ($ptitle, $pid, $pcontent, $pcontentType, $plinkArray);
         $this->book = $pbook;
@@ -539,6 +493,8 @@ class EntryBook extends Entry
 
     public function getCoverThumbnail () {
         foreach ($this->linkArray as $link) {
+            /* @var $link LinkNavigation */
+
             if ($link->rel == Link::OPDS_THUMBNAIL_TYPE)
                 return $link->hrefXhtml ();
         }
@@ -547,6 +503,8 @@ class EntryBook extends Entry
 
     public function getCover () {
         foreach ($this->linkArray as $link) {
+            /* @var $link LinkNavigation */
+
             if ($link->rel == Link::OPDS_IMAGE_TYPE)
                 return $link->hrefXhtml ();
         }
@@ -568,6 +526,8 @@ class Page
     public $n;
     public $book;
     public $totalNumber = -1;
+
+    /* @var Entry[] */
     public $entryArray = array();
 
     public static function getPage ($pageId, $id, $query, $n)
@@ -631,7 +591,7 @@ class Page
         $this->query = $pquery;
         $this->n = $pn;
         $this->favicon = $config['cops_icon'];
-        $this->authorName = empty($config['cops_author_name']) ? utf8_encode('S�bastien Lucas') : $config['cops_author_name'];
+        $this->authorName = empty($config['cops_author_name']) ? utf8_encode('Sébastien Lucas') : $config['cops_author_name'];
         $this->authorUri = empty($config['cops_author_uri']) ? 'http://blog.slucas.fr' : $config['cops_author_uri'];
         $this->authorEmail = empty($config['cops_author_email']) ? 'sebastien@slucas.fr' : $config['cops_author_email'];
     }
@@ -676,9 +636,9 @@ class Page
                 if (!is_null ($languages)) array_push ($this->entryArray, $languages);
             }
             foreach ($config['cops_calibre_custom_column'] as $lookup) {
-                $customId = CustomColumn::getCustomId ($lookup);
-                if (!is_null ($customId)) {
-                    array_push ($this->entryArray, CustomColumn::getCount($customId));
+                $customColumn = CustomColumnType::createByLookup($lookup);
+                if (!is_null ($customColumn) && $customColumn->isSearchable()) {
+                    array_push ($this->entryArray, $customColumn->getCount());
                 }
             }
             $this->entryArray = array_merge ($this->entryArray, Book::getCount());
@@ -807,10 +767,10 @@ class PageCustomDetail extends Page
     public function InitializeContent ()
     {
         $customId = getURLParam ("custom", NULL);
-        $custom = CustomColumn::getCustomById ($customId, $this->idGet);
+        $custom = CustomColumn::createCustom ($customId, $this->idGet);
         $this->idPage = $custom->getEntryId ();
-        $this->title = $custom->name;
-        list ($this->entryArray, $this->totalNumber) = Book::getBooksByCustom ($customId, $this->idGet, $this->n);
+        $this->title = $custom->value;
+        list ($this->entryArray, $this->totalNumber) = Book::getBooksByCustom ($custom, $this->idGet, $this->n);
     }
 }
 
@@ -819,9 +779,11 @@ class PageAllCustoms extends Page
     public function InitializeContent ()
     {
         $customId = getURLParam ("custom", NULL);
-        $this->title = CustomColumn::getAllTitle ($customId);
-        $this->entryArray = CustomColumn::getAllCustoms($customId);
-        $this->idPage = CustomColumn::getAllCustomsId ($customId);
+        $columnType = CustomColumnType::createByCustomID($customId);
+        
+        $this->title = $columnType->getTitle();
+        $this->entryArray = $columnType->getAllCustomValues();
+        $this->idPage = $columnType->getAllCustomsId();
     }
 }
 
@@ -945,7 +907,7 @@ class PageQueryResult extends Page
     private function searchByScope ($scope, $limit = FALSE) {
         $n = $this->n;
         $numberPerPage = NULL;
-        $queryNormedAndUp = $this->query;
+        $queryNormedAndUp = trim($this->query);
         if (useNormAndUp ()) {
             $queryNormedAndUp = normAndUp ($this->query);
         }
@@ -1195,7 +1157,6 @@ class PageCustomize extends Page
     }
 }
 
-
 abstract class Base
 {
     const PAGE_INDEX = "index";
@@ -1266,7 +1227,7 @@ abstract class Base
         if (self::isMultipleDatabaseEnabled ()) {
             if (is_null ($database)) $database = GetUrlParam (DB, 0);
             if (!is_null($database) && !preg_match('/^\d+$/', $database)) {
-                return self::error ($database);
+                self::error ($database);
             }
             $array = array_keys ($config['calibre_directory']);
             return  $array[$database];
@@ -1279,7 +1240,7 @@ abstract class Base
         if (self::isMultipleDatabaseEnabled ()) {
             if (is_null ($database)) $database = GetUrlParam (DB, 0);
             if (!is_null($database) && !preg_match('/^\d+$/', $database)) {
-                return self::error ($database);
+                self::error ($database);
             }
             $array = array_values ($config['calibre_directory']);
             return  $array[$database];
@@ -1350,10 +1311,14 @@ abstract class Base
     }
 
     public static function getEntryArrayWithBookNumber ($query, $columns, $params, $category) {
+        /* @var $result PDOStatement */
+
         list (, $result) = self::executeQuery ($query, $columns, "", $params, -1);
         $entryArray = array();
         while ($post = $result->fetchObject ())
         {
+            /* @var $instance Author|Tag|Serie|Publisher */
+
             $instance = new $category ($post);
             if (property_exists($post, "sort")) {
                 $title = $post->sort;

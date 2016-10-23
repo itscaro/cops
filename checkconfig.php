@@ -5,14 +5,12 @@
  * COPS (Calibre OPDS PHP Server) Configuration check
  *
  * @license    GPL 2 (http://www.gnu.org/licenses/gpl.html)
- * @author     Sébastien Lucas <sebastien@slucas.fr>
+ * @author     SÃ©bastien Lucas <sebastien@slucas.fr>
  *
  */
 
     require_once ("config.php");
     require_once ("base.php");
-
-    header ("Content-Type:text/html; charset=UTF-8");
 
     $err = getURLParam ("err", -1);
     $full = getURLParam ("full");
@@ -170,9 +168,9 @@ foreach (Base::getDbList () as $name => $database) {
             <h4>
             <?php
             if (!preg_match ("#^http#", $database)) {
-                echo "OK";
+                echo "{$name} OK";
             } else {
-                echo "Calibre path has to be local (no URL allowed)";
+                echo "{$name} Calibre path has to be local (no URL allowed)";
             }
             ?>
             </h4>

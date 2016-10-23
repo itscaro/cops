@@ -3,7 +3,7 @@
  * COPS (Calibre OPDS PHP Server) test file
  *
  * @license    GPL 2 (http://www.gnu.org/licenses/gpl.html)
- * @author     Sébastien Lucas <sebastien@slucas.fr>
+ * @author     SÃ©bastien Lucas <sebastien@slucas.fr>
  */
 
 require_once (dirname(__FILE__) . "/config_test.php");
@@ -28,11 +28,7 @@ class OpdsTest extends PHPUnit_Framework_TestCase
 
     function jingValidateSchema($feed, $relax = OPDS_RELAX_NG) {
         $path = "";
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // huge hack, not proud about it
-            $path = "c:\\Progra~1\\Java\\jre1.8.0_25\\bin\\";
-        }
-        $res = system($path . 'java -jar ' . JING_JAR . ' ' . $relax . ' ' . $feed);
+        $res = system($path . 'java -jar "' . JING_JAR . '" "' . $relax . '" "' . $feed . '"');
         if ($res != '') {
             echo 'RelaxNG validation error: '.$res;
             return false;
@@ -44,11 +40,7 @@ class OpdsTest extends PHPUnit_Framework_TestCase
         $oldcwd = getcwd(); // Save the old working directory
         chdir("test");
         $path = "";
-        if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-            // huge hack, not proud about it
-            $path = "c:\\Progra~1\\Java\\jre1.8.0_25\\bin\\";
-        }
-        $res = system($path . 'java -jar ' . OPDSVALIDATOR_JAR . ' ' . $feed);
+        $res = system($path . 'java -jar "' . OPDSVALIDATOR_JAR . '" "' . $feed . '"');
         chdir($oldcwd);
         if ($res != '') {
             echo 'OPDS validation error: '.$res;

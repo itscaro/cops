@@ -171,14 +171,34 @@
     $config['cops_books_filter'] = array ();
 
     /*
-     * Custom Columns to add  as an array containing the lookup names
-     * configured in Calibre
+     * Custom Columns for the index page
+     * to add as an array containing the lookup names configured in Calibre
      *
      * For example : array ("genre", "mycolumn");
      *
-     * Note that for now only the first, second and forth type of custom columns are supported
+     * Note that the composite custom columns are not supported
      */
     $config['cops_calibre_custom_column'] = array ();
+
+    /*
+     * Custom Columns for the list representation
+     * to add as an array containing the lookup names configured in Calibre
+     *
+     * For example : array ("genre", "mycolumn");
+     *
+     * Note that the composite custom columns are not supported
+     */
+    $config['cops_calibre_custom_column_list'] = array ();
+
+    /*
+     * Custom Columns for the book preview panel
+     * to add as an array containing the lookup names configured in Calibre
+     *
+     * For example : array ("genre", "mycolumn");
+     *
+     * Note that the composite custom columns are not supported
+     */
+    $config['cops_calibre_custom_column_preview'] = array ();
 
     /*
      * Rename .epub to .kepub.epub if downloaded from a Kobo eReader
@@ -227,6 +247,15 @@
      * any url : Send a constant image as the thumbnail (you can try "images/bookcover.png")
      */
     $config['cops_thumbnail_handling'] = "";
+
+    /*
+     * Directory to keep resized thumbnails: allow to resize thumbnails only on first access, then use this cache.
+     * $config['cops_thumbnail_handling'] must be ""
+     * "" : don't cache thumbnail
+     * "/tmp/cache/" (example) : will generate thumbnails in /tmp/cache/
+     * BEWARE : it has to end with a /
+     */
+    $config['cops_thumbnail_cache_directory'] = "";
 
     /*
      * Contains a list of user agent for browsers not compatible with client side rendering
@@ -284,6 +313,16 @@
      * 'bootstrap'
      */
     $config['cops_template'] = 'default';
+
+    /*
+     * Which style is used by default :
+     * 'base'
+     * 'default'
+     * 'eink' (only available for the 'default' template)
+     * 'iphone' (only available for the 'default' template)
+     * 'iphone7' (only available for the 'default' template)
+     */
+    $config['cops_style'] = 'default';
 
     /*
      * Set language code to force a language (see lang/ directory for available languages).
