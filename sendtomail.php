@@ -1,8 +1,7 @@
 <?php
 
-require_once ("config.php");
-require_once "resources/PHPMailer/class.phpmailer.php";
-require_once "book.php";
+require_once dirname(__FILE__) . '/config.php';
+require_once dirname(__FILE__) . '/base.php';
 
 function checkConfiguration () {
     global $config;
@@ -63,6 +62,7 @@ $mail->SMTPAuth = !empty ($config['cops_mail_configuration']["smtp.username"]);
 if (!empty ($config['cops_mail_configuration']["smtp.username"])) $mail->Username = $config['cops_mail_configuration']["smtp.username"];
 if (!empty ($config['cops_mail_configuration']["smtp.password"])) $mail->Password = $config['cops_mail_configuration']["smtp.password"];
 if (!empty ($config['cops_mail_configuration']["smtp.secure"])) $mail->SMTPSecure = $config['cops_mail_configuration']["smtp.secure"];
+if (!empty ($config['cops_mail_configuration']["smtp.port"])) $mail->Port = $config['cops_mail_configuration']["smtp.port"];
 
 $mail->From = $config['cops_mail_configuration']["address.from"];
 $mail->FromName = $config['cops_title_default'];
@@ -76,7 +76,11 @@ $mail->AddAttachment($data->getLocalPath ());
 
 $mail->IsHTML(true);
 $mail->CharSet = "UTF-8";
-$mail->Subject = 'Sent by COPS : ' . $data->getUpdatedFilename ();
+$mail->Subject = 'Sent by COPS : ';
+if (!empty ($config['cops_mail_configuration']["subject"])) {
+    $mail->Subject = $config['cops_mail_configuration']["subject"];
+}
+$mail->Subject .= $data->getUpdatedFilename ();
 $mail->Body    = "<h1>" . $book->title . "</h1><h2>" . $book->getAuthorsName () . "</h2>" . $book->getComment ();
 $mail->AltBody = "Sent by COPS";
 

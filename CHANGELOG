@@ -1,4 +1,19 @@
-1.0.1 - 201610XX
+1.1.1 - 20170502
+ * Fixed the handling of user specific configuration files. Thanks to marioscube, chadberg for the diagnostic / fix and Neil for the PR.
+ * Changed the cog on the upper right to a magnifying glass icon. Thanks to horus68.
+ * Added test on travis on PHP 5.4.
+ * Added a way to specify the secure SMTP port. Thanks to ubupl.
+
+1.1.0 - 20170402
+ * Upgraded to PHPMailer 5.2.21.
+ * Merged a huge PR that clean most of COPS source code. Thanks to Markus Birth for his work and his patience.
+ * Updated German, Greek, Italian, Polish, Romanian, Russian, Turkish translations. Check Transifex for the authors.
+ * Fixed a bad external dependency in login.html causing problem with HTTPS. Thanks to polytan02.
+ * Fixed minor gui nitpick.
+ * Added automatic redirection to the OPDS feed for many new Android apps (see #309). Thanks to horus68.
+ * Added a configuration item to set the mail subject.
+
+1.0.1 - 20161015
  * Fixed some type of custom column showing id instead of text - Thanks to Mike Schwörer.
  * Fixed the redirection to the OPDS catalog for Moon+ Reader.
  * Fixed the mail character encoding, now in UTF-8.
